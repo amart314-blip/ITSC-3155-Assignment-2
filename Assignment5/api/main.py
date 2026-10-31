@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi.middleware.cors import CORSMiddleware
 
 from .models import models, schemas
-from .controllers import orders
+from .controllers import sandwiches, orders, resources, recipes
 from .dependencies.database import engine, get_db
 
 models.Base.metadata.create_all(bind=engine)
@@ -53,3 +53,171 @@ def delete_one_order(order_id: int, db: Session = Depends(get_db)):
     if order is None:
         raise HTTPException(status_code=404, detail="User not found")
     return orders.delete(db=db, order_id=order_id)
+
+
+# Create a new sandwich
+@app.post("/sandwiches/", response_model=schemas.Sandwich, tags=["Sandwiches"])
+def create_sandwich(sandwich: schemas.SandwichCreate, db: Session = Depends(get_db)):
+    return sandwiches.create(db=db, sandwich=sandwich)
+
+
+# Get all sandwiches
+@app.get("/sandwiches/", response_model=list[schemas.Sandwich], tags=["Sandwiches"])
+def read_sandwiches(db: Session = Depends(get_db)):
+    return sandwiches.read_all(db)
+
+
+# Get one sandwich by ID
+@app.get("/sandwiches/{sandwich_id}", response_model=schemas.Sandwich, tags=["Sandwiches"])
+def read_one_sandwich(sandwich_id: int, db: Session = Depends(get_db)):
+    sandwich = sandwiches.read_one(db, sandwich_id=sandwich_id)
+
+    if sandwich is None:
+        raise HTTPException(status_code=404, detail="Sandwich not found")
+
+    return sandwich
+
+
+# Update an existing sandwich
+@app.put("/sandwiches/{sandwich_id}", response_model=schemas.Sandwich, tags=["Sandwiches"])
+def update_one_sandwich(sandwich_id: int, sandwich: schemas.SandwichUpdate, db: Session = Depends(get_db)):
+    sandwich_db = sandwiches.read_one(db, sandwich_id=sandwich_id)
+
+    if sandwich_db is None:
+        raise HTTPException(status_code=404, detail="Sandwich not found")
+
+    return sandwiches.update(db=db, sandwich_id=sandwich_id, sandwich=sandwich)
+
+
+# Delete a sandwich
+@app.delete("/sandwiches/{sandwich_id}", tags=["Sandwiches"])
+def delete_one_sandwich(sandwich_id: int, db: Session = Depends(get_db)):
+    sandwich = sandwiches.read_one(db, sandwich_id=sandwich_id)
+
+    if sandwich is None:
+        raise HTTPException(status_code=404, detail="Sandwich not found")
+
+    return sandwiches.delete(db=db, sandwich_id=sandwich_id)
+
+
+# ---------------- RESOURCES ----------------
+
+# Get all resources
+@app.get("/resources/", response_model=list[schemas.Resource], tags=["Resources"])
+def read_resources(db: Session = Depends(get_db)):
+    return resources.read_all(db)
+
+
+# Create a new resource
+@app.post("/resources/", response_model=schemas.Resource, tags=["Resources"])
+def create_resource(resource: schemas.ResourceCreate, db: Session = Depends(get_db)):
+    return resources.create(db=db, resource=resource)
+
+
+# Get one resource
+@app.get("/resources/{resource_id}", response_model=schemas.Resource, tags=["Resources"])
+def read_one_resource(resource_id: int, db: Session = Depends(get_db)):
+    resource_db = resources.read_one(db, resource_id=resource_id)
+
+    if resource_db is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+
+    return resource_db
+
+
+# Update a resource
+@app.put("/resources/{resource_id}", response_model=schemas.Resource, tags=["Resources"])
+def update_one_resource(resource_id: int, resource: schemas.ResourceUpdate, db: Session = Depends(get_db)):
+    resource_db = resources.read_one(db, resource_id=resource_id)
+
+    if resource_db is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+
+    return resources.update(db=db, resource_id=resource_id, resource=resource)
+
+
+# Delete a resource
+@app.delete("/resources/{resource_id}", status_code=204, tags=["Resources"])
+def delete_one_resource(resource_id: int, db: Session = Depends(get_db)):
+    resource_db = resources.read_one(db, resource_id=resource_id)
+
+    if resource_db is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+
+    return resources.delete(db=db, resource_id=resource_id)
+
+
+# ---------------- RECIPES ----------------
+
+# Get all recipes
+@app.get("/recipes/", response_model=list[schemas.Recipe], tags=["Recipes"])
+def read_recipes(db: Session = Depends(get_db)):
+    return recipes.read_all(db)
+
+
+# Create a new recipe
+@app.post("/recipes/", response_model=schemas.Recipe, tags=["Recipes"])
+def create_recipe(recipe: schemas.RecipeCreate, db: Session = Depends(get_db)):
+    # Make sure the sandwich exists
+    sandwich_db = sandwiches.read_one(db, sandwich_id=recipe.sandwich_id)
+
+    if sandwich_db is None:
+        raise HTTPException(status_code=404, detail="Sandwich not found")
+
+    # Make sure the resource exists
+    resource_db = resources.read_one(db, resource_id=recipe.resource_id)
+
+    if resource_db is None:
+        raise HTTPException(status_code=404, detail="Resource not found")
+
+    return recipes.create(db=db, recipe=recipe)
+
+
+# Get one recipe by ID
+@app.get("/recipes/{recipe_id}", response_model=schemas.Recipe, tags=["Recipes"])
+def read_one_recipe(recipe_id: int, db: Session = Depends(get_db)):
+    recipe_db = recipes.read_one(db, recipe_id=recipe_id)
+
+    if recipe_db is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    return recipe_db
+
+
+# Update an existing recipe
+@app.put("/recipes/{recipe_id}", response_model=schemas.Recipe, tags=["Recipes"])
+def update_one_recipe(recipe_id: int, recipe: schemas.RecipeUpdate, db: Session = Depends(get_db)):
+    recipe_db = recipes.read_one(db, recipe_id=recipe_id)
+
+    if recipe_db is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    # Check any new sandwich ID
+    if recipe.sandwich_id is not None:
+        sandwich_db = sandwiches.read_one(db, sandwich_id=recipe.sandwich_id)
+
+        if sandwich_db is None:
+            raise HTTPException(status_code=404, detail="Sandwich not found")
+
+    # Check any new resource ID
+    if recipe.resource_id is not None:
+        resource_db = resources.read_one(db, resource_id=recipe.resource_id)
+
+        if resource_db is None:
+            raise HTTPException(status_code=404, detail="Resource not found")
+
+    return recipes.update(db=db, recipe_id=recipe_id, recipe=recipe)
+
+
+# Delete a recipe
+@app.delete("/recipes/{recipe_id}", status_code=204, tags=["Recipes"])
+def delete_one_recipe(recipe_id: int, db: Session = Depends(get_db)):
+    recipe_db = recipes.read_one(db, recipe_id=recipe_id)
+
+    if recipe_db is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    return recipes.delete(db=db, recipe_id=recipe_id)
+
+
+
